@@ -94,9 +94,11 @@ Below are the outcome of the setup:
 ![](./media/image4.png)
 
 2. DHCP Server shows lease:
+
 ![](./media/image5.png) 
 
 3. End result on Windows 10 client side:
+
 ![](./media/image6.png) 
 
 ## Considerations running DHCP Server on Azure VM
