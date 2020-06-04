@@ -13,7 +13,7 @@ This is a brief guide on how to make DHCP Server running on Windows Server to pr
 
 It is important to mention the fact Windows DHCP Server role at this time is not supported on based on KB [2721672](https://support.microsoft.com/en-us/help/2721672/microsoft-server-software-support-for-microsoft-azure-virtual-machines).
 
-On Azure Virtual Network broadcast packets does not work by design but the intention of this guide showing the DHCP Relay feature which relies exclusively on unicast UDP packets on port 67. Here is a highlight from official Azure configuration: [What protocols can I use within VNets?](https://docs.microsoft.com/en-us/azure/virtual-network/virtual-networks-faq#what-protocols-can-i-use-within-vnets)
+On Azure Virtual Network broadcast packets does not work by design but the intention of this guide is to show the DHCP Relay feature which relies exclusively on unicast UDP packets on port 67. Here is a highlight from official Azure configuration: [What protocols can I use within VNets?](https://docs.microsoft.com/en-us/azure/virtual-network/virtual-networks-faq#what-protocols-can-i-use-within-vnets)
 
 _You can use TCP, UDP, and ICMP TCP/IP protocols within VNets. Unicast is supported within VNets, with the **exception of Dynamic Host Configuration Protocol (DHCP) via Unicast (source port UDP/68 / destination port UDP/67)** and UDP source port 65330 which is reserved for the host. Multicast, broadcast, IP-in-IP encapsulated packets, and Generic Routing Encapsulation (GRE) packets are blocked within VNets._
 
