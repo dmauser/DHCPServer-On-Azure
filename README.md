@@ -4,12 +4,12 @@
 Proof of Concept on how to run Windows DHCP Servers on Azure to assign dynamic IP to On-Prem networks.
 
 ***
-Disclaimer: This solution is not Supported by Microsoft. It should be used only as proof of concept.
+**DISCLAIMER**: This solution is currently not supported by Microsoft. It should be used only as proof of concept.
 ***
 
 ## Introduction
 
-This is a brief guide on how to make DHCP Server running on Windows Server to provide dynamic IP for **DHCP Relay Agent** requests from OnPremises Networks. 
+This is a brief guide on how to make DHCP Server running on Windows Server to provide dynamic IP for **DHCP Relay Agent** requests from OnPremises Networks.
 
 It is important to mention the fact Windows DHCP Server role at this time is not supported on based on KB [2721672](https://support.microsoft.com/en-us/help/2721672/microsoft-server-software-support-for-microsoft-azure-virtual-machines).
 
