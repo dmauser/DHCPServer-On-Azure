@@ -1,7 +1,7 @@
 
 # Running DHCP Server on Azure VM
 
-Proof of Concept on how to run Windows DHCP Servers on Azure to assign dynamic IP to On-Prem networks.
+Proof of Concept on how to run Windows DHCP Servers on Azure to assign dynamic IPs to On-Prem networks.
 
 ***
 **DISCLAIMER**: This solution is currently not supported by Microsoft. It should be used only as proof of concept.
