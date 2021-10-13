@@ -17,7 +17,7 @@ On Azure Virtual Network broadcast packets does not work by design but the inten
 
 _You can use TCP, UDP, and ICMP TCP/IP protocols within VNets. Unicast is supported within VNets, with the **exception of Dynamic Host Configuration Protocol (DHCP) via Unicast (source port UDP/68 / destination port UDP/67)** and UDP source port 65330 which is reserved for the host. Multicast, broadcast, IP-in-IP encapsulated packets, and Generic Routing Encapsulation (GRE) packets are blocked within VNets._
 
-**Update: Sept/2021** - There's also a DHCP throttling inside Azure platform specifically targeting DHCP requests and responses packets which also makes this solution not scalable. It is recommended opening a support ticket with Azure Support team to get more details.
+**Update: Sept/2021** - There's also a DHCP throttling feature inside the Azure platform that targets DHCP requests and responses packets. That feature also makes this solution not scalable to process large amount of DHCP requests. For more details, please open a support ticket with the Azure Support team.
 
 ## DHCP Relay Overview
 
