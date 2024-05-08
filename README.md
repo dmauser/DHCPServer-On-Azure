@@ -3,7 +3,7 @@
 
 For the latest guidance for Running DHCP Server on Azure VM, please refer to the [official documentation online](https://learn.microsoft.com/en-us/azure/virtual-network/virtual-networks-faq#can-i-deploy-a-dhcp-server-in-a-virtual-network).
 
-Additionally, check for additional considerations on the blog post [Running DHCP Server on Azure VM](https://techcommunity.microsoft.com/t5/azure-networking/running-dhcp-server-on-azure-vm/ba-p/1230000).
+Additionally, check for additional considerations on the blog post [Custom DHCP support in Azure](https://techcommunity.microsoft.com/t5/azure-networking-blog/custom-dhcp-support-in-azure/ba-p/4089674).
 
 ## Introduction
 
