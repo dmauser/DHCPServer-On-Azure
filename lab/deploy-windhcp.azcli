@@ -1,0 +1,162 @@
+#parameters
+rg=lab-windhcp
+location=eastus
+username=azureuser
+password=Msft123Msft123
+## Azure
+azvnet=az-vnet
+azvnetprefix=10.0.0.0/24
+azsubnet=subnet1
+azsubnetprefix=10.0.0.0/27
+azgatewayname=az-vpngw
+gatwaysubnet=10.0.0.32/27
+azbastionsubnet=10.0.0.64/26
+## On-premises
+onpremvnet=branch1-vnet
+onpremventprefix=192.168.0.0/24
+onpremsubnet=subnet1
+onpremsubnetprefix=192.168.0.0/27
+onprembastionsubnet=192.168.0.64/26
+
+# Create a resource group.
+echo Creating resource group
+az group create --name $rg --location $location -o none
+
+# Create Azure virtual network
+echo Creating Azure virtual network
+az network vnet create --name $azvnet --resource-group $rg --location $location --address-prefix $azvnetprefix --subnet-name $azsubnet --subnet-prefix $azsubnetprefix -o none
+
+# Create GatewaySubnet
+echo Creating GatewaySubnet
+az network vnet subnet create --address-prefix $gatwaysubnet --name GatewaySubnet --resource-group $rg --vnet-name $azvnet -o none
+
+# Create On-premises virtual network
+echo Creating On-premises virtual network
+az network vnet create --name $onpremvnet --resource-group $rg --location $location --address-prefix $onpremventprefix --subnet-name $onpremsubnet --subnet-prefix $onpremsubnetprefix -o none
+
+# Create NSG
+echo Creating NSG
+az network nsg create --name $location-default-nsg --resource-group $rg --location $location -o none
+# Associate NSG to subnet1 in az-vnet
+echo associating NSG to subnet1 in az-vnet
+az network vnet subnet update --name $azsubnet --vnet-name $azvnet --resource-group $rg --network-security-group $location-default-nsg -o none
+# Associate NSG to subnet1 in branch1-vnet
+echo associating NSG to subnet1 in branch1-vnet
+az network vnet subnet update --name $onpremsubnet --vnet-name $onpremvnet --resource-group $rg --network-security-group $location-default-nsg -o none
+
+# Create a Azure Bastion subnet
+echo Creating Azure Bastion subnet
+az network vnet subnet create --name AzureBastionSubnet --resource-group $rg --vnet-name $azvnet --address-prefix $azbastionsubnet -o none
+# Create Azure Bastion Public IP
+echo Creating Azure Bastion Public IP
+az network public-ip create --name az-bastion-pip --resource-group $rg --location $location --allocation-method static --sku standard -o none
+# Create Azure Bastion
+echo Creating Azure Bastion
+az network bastion create --name az-bastion --public-ip-address az-bastion-pip --resource-group $rg --vnet-name $azvnet --location $location --no-wait
+
+# Create On-premises Bastion subnet
+echo Creating On-premises Bastion subnet
+az network vnet subnet create --name AzureBastionSubnet --resource-group $rg --vnet-name $onpremvnet --address-prefix $onprembastionsubnet -o none
+# Create On-premises Bastion Public IP
+echo Creating On-premises Bastion Public IP
+az network public-ip create --name onprem-bastion-pip --resource-group $rg --location $location --allocation-method static --sku standard -o none
+# Create On-premises Bastion
+echo Creating On-premises Bastion
+az network bastion create --name onprem-bastion --public-ip-address onprem-bastion-pip --resource-group $rg --vnet-name $onpremvnet --location $location --no-wait
+
+# Create az-win-dhcp1
+echo Creating az-win-dhcp1
+az vm create --resource-group $rg --name az-win-dhcp1 --image MicrosoftWindowsServer:WindowsServer:2022-datacenter-smalldisk-g2:latest --size Standard_D2s_v3 --admin-username $username --admin-password $password --vnet-name $azvnet --subnet $azsubnet --public-ip-address "" --nsg "" --no-wait
+
+# Create az-win-dhcp2
+echo Creating az-win-dhcp2
+az vm create --resource-group $rg --name az-win-dhcp2 --image MicrosoftWindowsServer:WindowsServer:2022-datacenter-smalldisk-g2:latest --size Standard_D2s_v3 --admin-username $username --admin-password $password --vnet-name $azvnet --subnet $azsubnet --public-ip-address "" --nsg "" --no-wait
+
+# Loop script to check if both vm are ready
+echo Waiting for az-win-dhcp1 and az-win-dhcp2 to be ready
+while true
+do
+    az vm wait --name az-win-dhcp1 --resource-group $rg --created
+    az vm wait --name az-win-dhcp2 --resource-group $rg --created
+    if [ $? -eq 0 ]; then
+        break
+    fi
+done
+
+# Create an internal load balancer inside the az-vnet subnet1 and add both az-win-dhcp1 and az-win-dhcp2 to the backend pool
+echo Creating internal load balancer
+az network lb create --name az-win-dhcp-lb --resource-group $rg --location $location --sku Standard --vnet-name $azvnet --subnet $azsubnet --private-ip-address 10.0.0.10 --frontend-ip-name az-win-dhcp-lb-fedhcp1 -o none
+az network lb frontend-ip create --lb-name az-win-dhcp-lb --name az-win-dhcp-lb-fedhcp2 --resource-group $rg --vnet-name $azvnet --subnet $azsubnet --private-ip-address 10.0.0.11 -o none
+az network lb address-pool create --lb-name az-win-dhcp-lb --name be-dhcp1 --resource-group $rg --no-wait
+az network lb address-pool create --lb-name az-win-dhcp-lb --name be-dhcp2 --resource-group $rg --no-wait
+az network lb probe create --lb-name az-win-dhcp-lb --name az-win-dhcp-lb-probe --resource-group $rg --protocol Tcp --port 3389 --interval 5 --threshold 2 --no-wait
+az network lb rule create --lb-name az-win-dhcp-lb --name dhcp1-lb-rule --resource-group $rg --protocol UDP --frontend-port 67 --backend-port 67 --frontend-ip-name az-win-dhcp-lb-fedhcp1 --backend-pool-name be-dhcp1 --probe-name az-win-dhcp-lb-probe --enable-floating-ip --no-wait
+az network lb rule create --lb-name az-win-dhcp-lb --name dhcp2-lb-rule --resource-group $rg --protocol UDP --frontend-port 67 --backend-port 67 --frontend-ip-name az-win-dhcp-lb-fedhcp2 --backend-pool-name be-dhcp2 --probe-name az-win-dhcp-lb-probe --enable-floating-ip --no-wait
+
+# Attach az-win-dhcp1 and az-win-dhcp2 to the backend pool
+echo Attaching az-win-dhcp1 and az-win-dhcp2 to the backend pool
+az network nic ip-config address-pool add --address-pool be-dhcp1 --ip-config-name ipconfigaz-win-dhcp1 --nic-name az-win-dhcp1VMNic --resource-group $rg --lb-name az-win-dhcp-lb --output none
+az network nic ip-config address-pool add --address-pool be-dhcp2 --ip-config-name ipconfigaz-win-dhcp2 --nic-name az-win-dhcp2VMNic --resource-group $rg --lb-name az-win-dhcp-lb --output none 
+
+# Install DHCP role on az-win-dhcp1 using run command
+echo Installing DHCP role on az-win-dhcp1
+az vm run-command invoke --command-id RunPowerShellScript --name az-win-dhcp1 --resource-group $rg \
+ --scripts 'Install-WindowsFeature -Name DHCP -IncludeManagementTools' \
+ --no-wait
+
+# Install DHCP role on az-win-dhcp2 using run command
+echo Installing DHCP role on az-win-dhcp2
+az vm run-command invoke --command-id RunPowerShellScript --name az-win-dhcp2 --resource-group $rg \
+ --scripts 'Install-WindowsFeature -Name DHCP -IncludeManagementTools' \
+ --no-wait
+
+# Create a Azure virtual network gateway
+echo Creating Azure virtual network gateway
+az network public-ip create --name $azgatewayname-pip --resource-group $rg --location $location --allocation-method static --sku standard -o none
+az network vnet-gateway create --name $azgatewayname --public-ip-address $azgatewayname-pip --resource-group $rg --vnet $azvnet --gateway-type Vpn --vpn-type RouteBased --sku VpnGw1 --no-wait
+
+# Create vm onprem-hyperv1
+echo Creating vm onprem-hyperv1
+az vm create --resource-group $rg --name onprem-hyperv --image MicrosoftWindowsServer:WindowsServer:2022-datacenter-smalldisk-g2:latest --size Standard_D4s_v3 --admin-username $username --admin-password $password --vnet-name $onpremvnet --subnet $onpremsubnet --public-ip-address "" --nsg "" --no-wait
+# Continue only when the onprem-hyperv1 is ready
+echo waiting for onprem-hyperv1 to be ready
+az vm wait --name onprem-hyperv --resource-group $rg --created
+# Run the PowerShell script on onprem-hyperv1
+az vm run-command invoke --command-id RunPowerShellScript --name onprem-hyperv --resource-group $rg \
+ --scripts 'Enable-WindowsOptionalFeature –Online -FeatureName Microsoft-Hyper-V –All -NoRestart; Install-WindowsFeature RSAT-Hyper-V-Tools -IncludeAllSubFeature' \
+ --no-wait
+
+
+ # Add loopback adapter:
+ devcon.exe install %windir%\inf\netloop.inf *msloop
+
+ pnputil.exe /add-driver %windir%\inf\netloop.inf /install
+
+ # Restart DHCP Server after adding loopback adapter
+  Restart-Service -Name dhcpserver
+# Create IPv4 DHCP scope on az-win-dhcp1
+echo Creating IPv4 DHCP scope on az-win-dhcp1 and router and dns server options
+az vm run-command invoke --command-id RunPowerShellScript --name az-win-dhcp1 --resource-group $rg \
+ --scripts 'Add-DhcpServerv4Scope -Name "az-win-dhcp1" -StartRange 172.16.0.10 -EndRange 172.16.0.254 -SubnetMask 255.255.255.0 -State Active' \
+ --no-wait
+
+# Add Loopback adapter
+https://github.com/loadbalancerorg/lb-scripts
+
+
+# Enabel weak send and receive on the nics
+
+netsh int ipv4 set int 6  weakhostreceive=enabled weakhostsend=enabled
+netsh int ipv4 set int 10  weakhostreceive=enabled weakhostsend=enabled
+
+# Create Local Network Gateway
+echo Creating Local Network Gateway
+az network local-gateway create --gateway-ip-address 47.187.123.218 --name onprem-local-gateway --resource-group $rg --local-address-prefixes 192.168.1.0/24 --no-wait
+
+# Create vpn connection
+echo Creating VPN connection
+az network vpn-connection create --name az-to-onprem --resource-group $rg --vnet-gateway1 $azgatewayname --shared-key abc123 --local-gateway2 onprem-local-gateway -o none
+
+# Get VPN Gateway Public IP
+echo Getting VPN Gateway Public IP
+az network public-ip show --name $azgatewayname-pip --resource-group $rg --query ipAddress -o tsv

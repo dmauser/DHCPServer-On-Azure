@@ -1,27 +1,21 @@
 
-# Running DHCP Server on Azure VM
+# Running Windows DHCP Server on Azure VM
 
-Proof of Concept on how to run Windows DHCP Servers on Azure to assign dynamic IPs to On-Prem networks.
+For the latest guidance for Running DHCP Server on Azure VM, please refer to the [official documentation online](https://docs.microsoft.com/en-us/azure/virtual-network/virtual-networks-faq#what-protocols-can-i-use-within-vnets).
 
-***
-**DISCLAIMER**: This solution is currently not supported by Microsoft. It should be used only as proof of concept.
-***
+Additionally check for additional considerations on the blog post [Running DHCP Server on Azure VM](https://techcommunity.microsoft.com/t5/azure-networking/running-dhcp-server-on-azure-vm/ba-p/1230000).
 
 ## Introduction
 
-This is a brief guide on how to make DHCP Server running on Windows Server to provide dynamic IP for **DHCP Relay Agent** requests from OnPremises Networks.
+This is a brief guide on how to make DHCP Server run on Windows Server to provide dynamic IP for **DHCP Relay Agent** requests from On-premises Networks.
 
-It is important to mention the fact Windows DHCP Server role at this time is not supported on based on KB [2721672](https://support.microsoft.com/en-us/help/2721672/microsoft-server-software-support-for-microsoft-azure-virtual-machines).
+It is important to mention the fact Windows DHCP Server role at this time is not supported on a Azure VM when the NIC is directly connected to the VNET based on the KB [2721672](https://support.microsoft.com/en-us/help/2721672/microsoft-server-software-support-for-microsoft-azure-virtual-machines).
 
-On Azure Virtual Network broadcast packets does not work by design but the intention of this guide is to show the DHCP Relay feature which relies exclusively on unicast UDP packets on port 67. Here is a highlight from official Azure configuration: [What protocols can I use within VNets?](https://docs.microsoft.com/en-us/azure/virtual-network/virtual-networks-faq#what-protocols-can-i-use-within-vnets)
-
-_You can use TCP, UDP, and ICMP TCP/IP protocols within VNets. Unicast is supported within VNets, with the **exception of Dynamic Host Configuration Protocol (DHCP) via Unicast (source port UDP/68 / destination port UDP/67)** and UDP source port 65330 which is reserved for the host. Multicast, broadcast, IP-in-IP encapsulated packets, and Generic Routing Encapsulation (GRE) packets are blocked within VNets._
-
-**Update: Sept/2021** - There's also a DHCP throttling feature inside the Azure platform that targets DHCP requests and responses packets. That feature also makes this solution not scalable to process large amount of DHCP requests. For more details, please open a support ticket with the Azure Support team.
+However, there is a workaround to make it work by using a **Loopback Adapter** and setting a static IP on it and exposing that IP to the Azure VNET using an Azure Load Balancer and direct server return (also known as floating IP). This guide will show how to make it work and also how to configure a **DHCP Relay Agent** on Windows Server to forward DHCP requests from On-premises Networks.
 
 ## DHCP Relay Overview
 
-DHCP Relay Agent traffic has UDP using  source and destination port on 67 (same port, which is different from the remark of Azure VNET documentation above which says source UDP 68 and destination UDP 67). That DHCP relay traffic has been confirmed per capture sample below and also reviewed [RFC 8357](https://tools.ietf.org/html/rfc8357#section-3) under section 3.
+DHCP Relay Agent traffic has UDP using source and destination port on 67. That DHCP relay traffic has been confirmed per capture sample below and also reviewed [RFC 8357](https://tools.ietf.org/html/rfc8357#section-3) under section 3.
 
     # Below is what RFC describes regular DHCP Client to Server Ports. 
     # That is Azure Virtual Network traffic limitation for DHCP documentation refers to:
@@ -46,7 +40,7 @@ Here is an illustration of the LAB setup and traffic flow:
 
 ![](./media/image2.png)
 
-### OnPrem side (192.168.2.0/24)
+### On-premises side (192.168.2.0/24)
 
 - On-Prem side has to be done either on physical network or Hyper-V (It can be on Azure Hosted VM in Azure as well). Inside Hyper-V a VM with PFSense and two NICs (One NIC to External able to reach Internet and another to Hyper-V Internal).
 
@@ -58,7 +52,7 @@ Here is an illustration of the LAB setup and traffic flow:
 
 ### Azure Side (10.100.0.0/16)
 
-- Configure Azure VPN GW to terminate S2S VPN to OnPrem Pfsense. 
+- Configure Azure VPN GW to terminate S2S VPN to On-premises Pfsense. 
 - Single VNET with two Azure Windows Server VMs named DHCP1 and DHCP2.
 - Installed DHCP Role but DHCP service only runs when Windows has Static IP address (see details on [Considerations running DHCP Server on Azure VM](#considerations-running-dhcp-server-on-azure-vm) )
     - To workaround that install MS Loopback Interface and set IPs 10.100.0.100 on DHCP1 and 10.100.0.200 on DHCP2.
